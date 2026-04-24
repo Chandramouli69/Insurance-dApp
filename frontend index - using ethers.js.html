@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Decentralized Insurance DApp</title>
+
+    <!-- Ethers.js -->
+    <script src="https://cdn.jsdelivr.net/npm/ethers@6.7.0/dist/ethers.umd.min.js"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            margin: 0;
+            background: #f4f7fa;
+            color: #1f2937;
+        }
+
+        header {
+            background: #0f766e;
+            color: white;
+            text-align: center;
+            padding: 22px;
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .subtitle {
+            text-align: center;
+            margin-top: 8px;
+            color: #6b7280;
+            font-size: 15px;
+        }
+
+        .container {
+            width: 92%;
+            max-width: 1200px;
+            margin: 25px auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .full-width {
+            grid-column: span 2;
+        }
+
+        .card {
+            background: white;
+            border-radius: 14px;
+            padding: 24px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+        }
+
+        h2 {
+            margin-top: 0;
+            color: #0f766e;
+            font-size: 26px;
+        }
+
+        input, textarea {
+            width: 100%;
+            padding: 12px;
+            margin-top: 8px;
+            margin-bottom: 14px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 15px;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 90px;
+        }
+
+        button {
+            background: #0f766e;
+            color: white;
+            border: none;
+            padding: 12px 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 15px;
+            margin-right: 10px;
+            margin-top: 6px;
+        }
+
+        button:hover {
+            background: #0b5d56;
+        }
+
+        .secondary-btn {
+            background: #dbeafe;
+            color: #111827;
+        }
+
+        .secondary-btn:hover {
+            background: #bfdbfe;
+        }
+
+        .danger-btn {
+            background: #dc2626;
+        }
+
+        .danger-btn:hover {
+            background: #b91c1c;
+        }
+
+        .status-box {
+            background: #f8fafc;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            padding: 14px;
+            margin-top: 12px;
+            word-break: break-word;
+        }
+
+        .wallet-box {
+            font-weight: bold;
+            margin-top: 15px;
+            color: #111827;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #0f766e;
+            color: white;
+            padding: 14px 24px;
+            border-radius: 10px;
+            display: none;
+            z-index: 9999;
+            font-weight: bold;
+            max-width: 80%;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        .claim-list {
+            max-height: 280px;
+            overflow-y: auto;
+            border: 1px solid #d1d5db;
+            border-radius: 10px;
+            background: #f9fafb;
+            margin-top: 15px;
+            padding: 10px;
+        }
+
+        .claim-item {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 14px;
+            margin-bottom: 10px;
+        }
+
+        .claim-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .claim-title {
+            font-weight: bold;
+            color: #0f766e;
+            margin-bottom: 6px;
+        }
+
+        @media(max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+
+            .full-width {
+                grid-column: span 1;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<header>Simple Decentralized Insurance DApp</header>
+<div class="subtitle">
+    Transparent | Fast | Trustful Claim Settlement
+</div>
+
+<div id="notification" class="notification"></div>
+
+<div class="container">
+
+    <!-- BLOCK 1 -->
+    <div class="card full-width">
+        <h2>1️⃣ Connect MetaMask</h2>
+
+        <button id="connectWallet">
+            Connect Wallet
+        </button>
+
+        <div id="walletAddress" class="wallet-box">
+            Wallet not connected
+        </div>
+    </div>
+
+    <!-- BLOCK 2 -->
+    <div class="card">
+        <h2>2️⃣ Fund Contract (Insurer)</h2>
+
+        <label>Amount (ETH)</label>
+        <input
+            type="text"
+            id="fundAmount"
+            placeholder="e.g. 0.1"
+        >
+
+        <button id="fundBtn">
+            Fund Contract
+        </button>
+
+        <button
+            id="checkBalanceBtn"
+            class="secondary-btn"
+        >
+            Check Contract Balance
+        </button>
+
+        <div class="status-box">
+            Contract Balance:
+            <span id="contractBalance">
+                0 ETH
+            </span>
+        </div>
+
+        <h3 style="margin-top:25px;">Scrollable Claim List</h3>
+
+        <div id="claimList" class="claim-list">
+            No claims yet.
+        </div>
+    </div>
+
+    <!-- BLOCK 3 -->
+    <div class="card">
+        <h2>3️⃣ File a Claim (Customer)</h2>
+
+        <label>Claim Amount (Wei)</label>
+        <input
+            type="number"
+            id="claimAmount"
+            placeholder="e.g. 1000000000000000"
+        >
+
+        <label>Claim Description</label>
+        <textarea
+            id="claimDescription"
+            placeholder="Brief description of the incident"
+        ></textarea>
+
+        <button id="fileClaimBtn">
+            File Claim
+        </button>
+
+        <div
+            id="fileClaimTx"
+            class="status-box"
+            style="display:none;"
+        ></div>
+    </div>
+
+    <!-- BLOCK 4 -->
+    <div class="card">
+        <h2>4️⃣ Manage Claims (Insurer)</h2>
+
+        <label>Claim ID</label>
+        <input
+            type="number"
+            id="manageClaimId"
+            placeholder="Enter Claim ID"
+        >
+
+        <button
+            id="viewClaimBtn"
+            class="secondary-btn"
+        >
+            View Claim
+        </button>
+
+        <button id="approveBtn">
+            Approve Claim
+        </button>
+
+        <button
+            id="rejectBtn"
+            class="danger-btn"
+        >
+            Reject Claim
+        </button>
+
+        <div
+            id="claimDetailsBox"
+            class="status-box"
+            style="display:none;"
+        ></div>
+
+        <div
+            id="manageTx"
+            class="status-box"
+            style="display:none;"
+        ></div>
+    </div>
+
+    <!-- BLOCK 5 -->
+    <div class="card">
+        <h2>5️⃣ Pay Approved Claim (Insurer)</h2>
+
+        <label>Claim ID</label>
+        <input
+            type="number"
+            id="payClaimId"
+            placeholder="Enter Claim ID"
+        >
+
+        <button id="payBtn">
+            Pay Claim
+        </button>
+
+        <div
+            id="payTx"
+            class="status-box"
+            style="display:none;"
+        ></div>
+    </div>
+
+    <!-- BLOCK 6 -->
+    <div class="card">
+        <h2>6️⃣ Check Claim Status</h2>
+
+        <label>Claim ID</label>
+        <input
+            type="number"
+            id="statusId"
+            placeholder="Enter Claim ID"
+        >
+
+        <button
+            id="statusBtn"
+            class="secondary-btn"
+        >
+            Get Status
+        </button>
+
+        <div id="statusResult" class="status-box"></div>
+    </div>
+
+</div>
+
+<script>
+const contractAddress = "0x58CfDaF85560Aaf3FC959E470f12bd1fa90C0369";
+
+const contractABI = [
+  {
+				"inputs": [],
+				"stateMutability": "nonpayable",
+				"type": "constructor"
+			},
+			{
+				"anonymous": false,
+				"inputs": [
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "id",
+						"type": "uint256"
+					}
+				],
+				"name": "ClaimApproved",
+				"type": "event"
+			},
+			{
+				"anonymous": false,
+				"inputs": [
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "id",
+						"type": "uint256"
+					},
+					{
+						"indexed": true,
+						"internalType": "address",
+						"name": "customer",
+						"type": "address"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "amount",
+						"type": "uint256"
+					},
+					{
+						"indexed": false,
+						"internalType": "string",
+						"name": "description",
+						"type": "string"
+					}
+				],
+				"name": "ClaimFiled",
+				"type": "event"
+			},
+			{
+				"anonymous": false,
+				"inputs": [
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "id",
+						"type": "uint256"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "amount",
+						"type": "uint256"
+					}
+				],
+				"name": "ClaimPaid",
+				"type": "event"
+			},
+			{
+				"anonymous": false,
+				"inputs": [
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "id",
+						"type": "uint256"
+					}
+				],
+				"name": "ClaimRejected",
+				"type": "event"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "_id",
+						"type": "uint256"
+					}
+				],
+				"name": "approveClaim",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "claimCounter",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"name": "claims",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "id",
+						"type": "uint256"
+					},
+					{
+						"internalType": "address payable",
+						"name": "customer",
+						"type": "address"
+					},
+					{
+						"internalType": "uint256",
+						"name": "amount",
+						"type": "uint256"
+					},
+					{
+						"internalType": "enum SimpleDecentralizedInsurance.ClaimStatus",
+						"name": "status",
+						"type": "uint8"
+					},
+					{
+						"internalType": "string",
+						"name": "description",
+						"type": "string"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "_amount",
+						"type": "uint256"
+					},
+					{
+						"internalType": "string",
+						"name": "_description",
+						"type": "string"
+					}
+				],
+				"name": "fileClaim",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "fundContract",
+				"outputs": [],
+				"stateMutability": "payable",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "getAllClaims",
+				"outputs": [
+					{
+						"internalType": "uint256[]",
+						"name": "ids",
+						"type": "uint256[]"
+					},
+					{
+						"internalType": "uint256[]",
+						"name": "amounts",
+						"type": "uint256[]"
+					},
+					{
+						"internalType": "string[]",
+						"name": "descriptions",
+						"type": "string[]"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "_id",
+						"type": "uint256"
+					}
+				],
+				"name": "getClaim",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "id",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "amount",
+						"type": "uint256"
+					},
+					{
+						"internalType": "enum SimpleDecentralizedInsurance.ClaimStatus",
+						"name": "status",
+						"type": "uint8"
+					},
+					{
+						"internalType": "string",
+						"name": "description",
+						"type": "string"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "_id",
+						"type": "uint256"
+					}
+				],
+				"name": "getClaimStatus",
+				"outputs": [
+					{
+						"internalType": "enum SimpleDecentralizedInsurance.ClaimStatus",
+						"name": "",
+						"type": "uint8"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "insurer",
+				"outputs": [
+					{
+						"internalType": "address",
+						"name": "",
+						"type": "address"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "_id",
+						"type": "uint256"
+					}
+				],
+				"name": "payClaim",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "_id",
+						"type": "uint256"
+					}
+				],
+				"name": "rejectClaim",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"stateMutability": "payable",
+				"type": "receive"
+			}
+];
+
+let provider;
+let signer;
+let contract;
+
+function showNotification(message, color = "#0f766e") {
+    const notification = document.getElementById("notification");
+    notification.style.background = color;
+    notification.innerText = message;
+    notification.style.display = "block";
+
+    setTimeout(() => {
+        notification.style.display = "none";
+    }, 3500);
+}
+
+document.getElementById("connectWallet").onclick = async function () {
+    try {
+        if (!window.ethereum) {
+            showNotification("MetaMask not found", "#dc2626");
+            return;
+        }
+
+        provider = new ethers.BrowserProvider(window.ethereum);
+        await provider.send("eth_requestAccounts", []);
+        signer = await provider.getSigner();
+
+        const wallet = await signer.getAddress();
+
+        document.getElementById("walletAddress").innerText =
+            wallet;
+
+        contract = new ethers.Contract(
+            contractAddress,
+            contractABI,
+            signer
+        );
+
+        showNotification(
+            "Wallet connected successfully",
+            "#16a34a"
+        );
+
+        updateBalance();
+        loadAllClaims();
+
+    } catch (error) {
+        console.error(error);
+        showNotification(
+            "Connection failed",
+            "#dc2626"
+        );
+    }
+};
+
+document.getElementById("fundBtn").onclick = async function () {
+    try {
+        const amount =
+            document.getElementById("fundAmount").value;
+
+        const tx = await contract.fundContract({
+            value: ethers.parseEther(amount)
+        });
+
+        await tx.wait();
+
+        showNotification(
+            "Contract funded successfully",
+            "#16a34a"
+        );
+
+        updateBalance();
+
+    } catch (error) {
+        console.error(error);
+        showNotification(
+            "Funding failed",
+            "#dc2626"
+        );
+    }
+};
+
+document.getElementById("checkBalanceBtn").onclick =
+function () {
+    updateBalance();
+};
+
+async function updateBalance() {
+    if (!provider) return;
+
+    const balance =
+        await provider.getBalance(contractAddress);
+
+    document.getElementById("contractBalance").innerText =
+        ethers.formatEther(balance) + " ETH";
+}
+
+document.getElementById("fileClaimBtn").onclick = async function () {
+    try {
+        const amount =
+            document.getElementById("claimAmount").value;
+
+        const description =
+            document.getElementById("claimDescription").value;
+
+        const tx = await contract.fileClaim(
+            BigInt(amount),
+            description
+        );
+
+        const receipt = await tx.wait();
+
+        const box =
+            document.getElementById("fileClaimTx");
+
+        box.style.display = "block";
+        box.innerText =
+            "Claim Submitted Successfully";
+
+        showNotification(
+            "Claim filed successfully",
+            "#16a34a"
+        );
+
+        loadAllClaims();
+
+    } catch (error) {
+        console.error(error);
+        showNotification(
+            "Claim filing failed",
+            "#dc2626"
+        );
+    }
+};
+
+async function loadAllClaims() {
+    try {
+        if (!contract) return;
+
+        const result =
+            await contract.getAllClaims();
+
+        const ids = result[0];
+        const amounts = result[1];
+        const descriptions = result[2];
+
+        const list =
+            document.getElementById("claimList");
+
+        if (ids.length === 0) {
+            list.innerHTML = "No claims yet.";
+            return;
+        }
+
+        list.innerHTML = "";
+
+        for (let i = 0; i < ids.length; i++) {
+            const div =
+                document.createElement("div");
+
+            div.className = "claim-item";
+
+            div.innerHTML = `
+                <div class="claim-title">
+                    Claim ID: ${ids[i]}
+                </div>
+                <div>
+                    Amount: ${amounts[i]} Wei
+                </div>
+                <div>
+                    Reason: ${descriptions[i]}
+                </div>
+            `;
+
+            list.appendChild(div);
+        }
+
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+document.getElementById("viewClaimBtn").onclick = async function () {
+    try {
+        const id =
+            document.getElementById("manageClaimId").value;
+
+        const result =
+            await contract.getClaim(id);
+
+        const statusList = [
+            "NotFiled",
+            "Filed",
+            "Approved",
+            "Rejected",
+            "Paid"
+        ];
+
+        const box =
+            document.getElementById("claimDetailsBox");
+
+        box.style.display = "block";
+
+        box.innerHTML = `
+            <strong>Claim ID:</strong> ${result[0]}<br><br>
+            <strong>Amount:</strong> ${result[1]} Wei<br><br>
+            <strong>Status:</strong> ${statusList[Number(result[2])]}<br><br>
+            <strong>Description:</strong> ${result[3]}
+        `;
+
+    } catch (error) {
+        console.error(error);
+        showNotification(
+            "View claim failed",
+            "#dc2626"
+        );
+    }
+};
+
+document.getElementById("approveBtn").onclick = async function () {
+    try {
+        const id =
+            document.getElementById("manageClaimId").value;
+
+        const tx =
+            await contract.approveClaim(id);
+
+        await tx.wait();
+
+        document.getElementById("manageTx").style.display =
+            "block";
+
+        document.getElementById("manageTx").innerText =
+            "Claim Approved Successfully";
+
+        showNotification(
+            "Claim approved",
+            "#16a34a"
+        );
+
+    } catch (error) {
+        console.error(error);
+        showNotification(
+            "Approval failed",
+            "#dc2626"
+        );
+    }
+};
+
+document.getElementById("rejectBtn").onclick = async function () {
+    try {
+        const id =
+            document.getElementById("manageClaimId").value;
+
+        const tx =
+            await contract.rejectClaim(id);
+
+        await tx.wait();
+
+        document.getElementById("manageTx").style.display =
+            "block";
+
+        document.getElementById("manageTx").innerText =
+            "Claim Rejected Successfully";
+
+        showNotification(
+            "Claim rejected",
+            "#dc2626"
+        );
+
+    } catch (error) {
+        console.error(error);
+        showNotification(
+            "Rejection failed",
+            "#dc2626"
+        );
+    }
+};
+
+document.getElementById("payBtn").onclick = async function () {
+    try {
+        const id =
+            document.getElementById("payClaimId").value;
+
+        const tx =
+            await contract.payClaim(id);
+
+        await tx.wait();
+
+        document.getElementById("payTx").style.display =
+            "block";
+
+        document.getElementById("payTx").innerText =
+            "Payment Completed Successfully";
+
+        showNotification(
+            "Claim paid successfully",
+            "#16a34a"
+        );
+
+        updateBalance();
+
+    } catch (error) {
+        console.error(error);
+        showNotification(
+            "Payment failed",
+            "#dc2626"
+        );
+    }
+};
+
+document.getElementById("statusBtn").onclick = async function () {
+    try {
+        const id =
+            document.getElementById("statusId").value;
+
+        const status =
+            await contract.getClaimStatus(id);
+
+        const statusList = [
+            "NotFiled",
+            "Filed",
+            "Approved",
+            "Rejected",
+            "Paid"
+        ];
+
+        document.getElementById("statusResult").innerText =
+            "Status: " +
+            statusList[Number(status)];
+
+    } catch (error) {
+        console.error(error);
+        showNotification(
+            "Status check failed",
+            "#dc2626"
+        );
+    }
+};
+</script>
+
+</body>
+</html>
